@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simple Calculator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: Arial, sans-serif;
+        }
+
+        .calculator {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            width: 320px;
+        }
+
+        .display {
+            background: #333;
+            color: #fff;
+            font-size: 2em;
+            padding: 20px;
+            border-radius: 5px;
+            text-align: right;
+            margin-bottom: 20px;
+            word-wrap: break-word;
+            word-break: break-all;
+            min-height: 64px;
+        }
+
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+
+        button {
+            padding: 18px;
+            font-size: 1.4em;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background: #f0f0f0;
+            transition: background 0.2s;
+            user-select: none;
+        }
+
+        button:hover {
+            background: #e0e0e0;
+        }
+
+        button:active {
+            background: #d0d0d0;
+        }
+
+        .operator {
+            background: #667eea;
+            color: white;
+        }
+
+        .operator:hover {
+            background: #5568d3;
+        }
+
+        .equals {
+            background: #48bb78;
+            color: white;
+            grid-column: span 2;
+        }
+
+        .clear {
+            background: #f56565;
+            color: white;
+        }
+
+        .clear:hover {
+            background: #e53e3e;
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator" role="application">
+        <div id="display" class="display" aria-live="polite">0</div>
+        <div class="buttons">
+            <button class="clear" id="clear">C</button>
+            <button class="operator" data-op="%">%</button>
+            <button class="operator" data-op="/">÷</button>
+            <button class="operator" data-op="*">×</button>
+
+            <button data-digit="7">7</button>
+            <button data-digit="8">8</button>
+            <button data-digit="9">9</button>
+            <button class="operator" data-op="-">−</button>
+
+            <button data-digit="4">4</button>
+            <button data-digit="5">5</button>
+            <button data-digit="6">6</button>
+            <button class="operator" data-op="+">+</button>
+
+            <button data-digit="1">1</button>
+            <button data-digit="2">2</button>
+            <button data-digit="3">3</button>
+            <button class="equals" id="equals">=</button>
+
+            <button data-digit="0" style="grid-column: span 2;">0</button>
+            <button data-dot=".">.</button>
+        </div>
+    </div>
+
+    <script>
+        const display = document.getElementById('display');
+        let value = '';
+        let lastResult = null;
+
+        function updateDisplay(text) {
+            display.textContent = text;
+        }
+
+        function sanitizeExpression(expr) {
+            return expr.replace(/×/g, '*').replace(/÷/g, '/');
+        }
+
+        function calculate() {
+            if (!value) return;
+            try {
+                let sanitized = sanitizeExpression(value);
+                // support percent usage like 50% -> 0.5, or 50+20% -> 50+0.2
+                sanitized = sanitized.replace(/(\d+(?:\.\d+)?)%/g, '($1/100)');
+                const result = Function('return ' + sanitized)();
+                if (result === Infinity || result === -Infinity || Number.isNaN(result)) {
+                    updateDisplay('Error');
+                    value = '';
+                    return;
+                }
+                lastResult = result;
+                value = String(result);
+                updateDisplay(value);
+            } catch (err) {
+                updateDisplay('Error');
+                value = '';
+            }
+        }
+
+        function append(text) {
+            if (display.textContent === '0' && text !== '.') {
+                value = text;
+            } else {
+                value += text;
+            }
+            updateDisplay(value);
+        }
+
+        document.querySelectorAll('[data-digit]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                append(btn.dataset.digit);
+            });
+        });
+
+        document.querySelectorAll('[data-op]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                if (!value && lastResult != null) {
+                    value = String(lastResult);
+                }
+                if (!value) return;
+                if (/[+\-*/%]$/.test(value)) {
+                    value = value.slice(0, -1);
+                }
+                value += btn.dataset.op;
+                updateDisplay(value);
+            });
+        });
+
+        document.querySelector('[data-dot]').addEventListener('click', () => {
+            if (!value) {
+                value = '0.';
+                updateDisplay(value);
+                return;
+            }
+            const parts = value.split(/[+\-*/%]/);
+            const last = parts[parts.length - 1];
+            if (!last.includes('.')) {
+                value += '.';
+                updateDisplay(value);
+            }
+        });
+
+        document.getElementById('clear').addEventListener('click', () => {
+            value = '';
+            lastResult = null;
+            updateDisplay('0');
+        });
+
+        document.getElementById('equals').addEventListener('click', calculate);
+
+        window.addEventListener('keydown', (event) => {
+            const key = event.key;
+            if (/^[0-9]$/.test(key)) {
+                append(key);
+            } else if (key === '.' || key === ',') {
+                event.preventDefault();
+                document.querySelector('[data-dot]').click();
+            } else if (['+', '-', '*', '/','%'].includes(key)) {
+                event.preventDefault();
+                const btn = document.querySelector(`[data-op="${key}"]`);
+                if (btn) btn.click();
+            } else if (key === 'Enter' || key === '=') {
+                event.preventDefault();
+                calculate();
+            } else if (key === 'Escape' || key.toLowerCase() === 'c') {
+                event.preventDefault();
+                document.getElementById('clear').click();
+            }
+        });
+    </script>
+</body>
+</html>
+        }
+
+        .equals:hover {
+            background: #38a169;
+        }
+
+        .clear {
+            background: #f56565;
+            color: white;
+            grid-column: span 2;
+        }
+
+        .clear:hover {
+            background: #e53e3e;
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <div class="display" id="display">0</div>
+        <div class="buttons">
+            <button class="clear" onclick="clearDisplay()">C</button>
+            <button class="operator" onclick="appendOperator('/')">÷</button>
+            <button class="operator" onclick="appendOperator('*')">×</button>
+            
+            <button onclick="appendNumber('7')">7</button>
+            <button onclick="appendNumber('8')">8</button>
+            <button onclick="appendNumber('9')">9</button>
+            <button class="operator" onclick="appendOperator('-')">−</button>
+            
+            <button onclick="appendNumber('4')">4</button>
+            <button onclick="appendNumber('5')">5</button>
+            <button onclick="appendNumber('6')">6</button>
+            <button class="operator" onclick="appendOperator('+')">+</button>
+            
+            <button onclick="appendNumber('1')">1</button>
+            <button onclick="appendNumber('2')">2</button>
+            <button onclick="appendNumber('3')">3</button>
+            <button onclick="deleteLast()">←</button>
+            
+            <button onclick="appendNumber('0')" style="grid-column: span 2;">0</button>
+            <button onclick="appendNumber('.')">.</button>
+            <button class="equals" onclick="calculate()">=</button>
+        </div>
+    </div>
+
+    <script>
+        let display = document.getElementById('display');
+        let currentInput = '0';
+        let operator = null;
+        let previousValue = null;
+
+        function updateDisplay() {
+            display.textContent = currentInput;
+        }
+
+        function appendNumber(num) {
+            if (currentInput === '0' && num !== '.') {
+                currentInput = num;
+            } else if (num === '.' && currentInput.includes('.')) {
+                return;
+            } else {
+                currentInput += num;
+            }
+            updateDisplay();
+        }
+
+        function appendOperator(op) {
+            if (operator !== null) {
+                calculate();
+            }
+            previousValue = currentInput;
+            operator = op;
+            currentInput = '0';
+        }
+
+        function calculate() {
+            if (operator === null || previousValue === null) return;
+
+            let result;
+            const prev = parseFloat(previousValue);
+            const current = parseFloat(currentInput);
+
+            switch (operator) {
+                case '+':
+                    result = prev + current;
+                    break;
+                case '-':
+                    result = prev - current;
+                    break;
+                case '*':
+                    result = prev * current;
+                    break;
+                case '/':
+                    result = prev / current;
+                    break;
+                default:
+                    return;
+            }
+
+            currentInput = result.toString();
+            operator = null;
+            previousValue = null;
+            updateDisplay();
+        }
+
+        function clearDisplay() {
+            currentInput = '0';
+            operator = null;
+            previousValue = null;
+            updateDisplay();
+        }
+
+        function deleteLast() {
+            if (currentInput.length > 1) {
+                currentInput = currentInput.slice(0, -1);
+            } else {
+                currentInput = '0';
+            }
+            updateDisplay();
+        }
+
+        updateDisplay();
+    </script>
+</body>
+</html>
